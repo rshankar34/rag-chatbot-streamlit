@@ -93,7 +93,7 @@ def process_pdf(file_bytes, filename):
 def get_qa_chain():
     """Create QA chain"""
     llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo",
+        model_name="gpt-4o-mini",
         temperature=0.3,
         max_tokens=500,
         openai_api_key=st.secrets["OPENAI_API_KEY"]
