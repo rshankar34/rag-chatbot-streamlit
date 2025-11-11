@@ -92,27 +92,31 @@ def process_pdf(file_bytes, filename):
 
 def get_qa_chain():
     """Create QA chain"""
-    llm = ChatOpenAI(
-        model_name="gpt-4o-mini",
-        temperature=0.3,
-        max_tokens=500,
-        openai_api_key=st.secrets["OPENAI_API_KEY"]
-    )
-    
-    template = """Use the context to answer the question. If unsure, say so.
+    try:
+        llm = ChatOpenAI(
+            model="gpt-4o-mini",
+            temperature=0.3,
+            max_tokens=500,
+            api_key=st.secrets["OPENAI_API_KEY"]
+        )
+        
+        template = """Use the context to answer the question. If unsure, say so.
 
 Context: {context}
 Question: {question}
 Answer:"""
-    
-    prompt = PromptTemplate(template=template, input_variables=["context", "question"])
-    
-    return RetrievalQA.from_chain_type(
-        llm=llm,
-        retriever=st.session_state.vector_store.as_retriever(search_kwargs={"k": 4}),
-        return_source_documents=True,
-        chain_type_kwargs={"prompt": prompt}
-    )
+        
+        prompt = PromptTemplate(template=template, input_variables=["context", "question"])
+        
+        return RetrievalQA.from_chain_type(
+            llm=llm,
+            retriever=st.session_state.vector_store.as_retriever(search_kwargs={"k": 4}),
+            return_source_documents=True,
+            chain_type_kwargs={"prompt": prompt}
+        )
+    except Exception as e:
+        st.error(f"Error creating QA chain: {e}")
+        return None
 
 # UI
 st.title("☁️ RAG PDF Chatbot")
