@@ -19,8 +19,19 @@ st.set_page_config(page_title="RAG PDF Chatbot", page_icon="☁️", layout="wid
 # Initialize AWS services
 @st.cache_resource
 def init_aws():
-    s3 = S3Manager(bucket_name=st.secrets["S3_BUCKET_NAME"])
-    dynamo = DynamoDBChat()
+    """Initialize AWS services with explicit region"""
+    region = st.secrets.get("AWS_REGION", "eu-north-1")
+    
+    s3 = S3Manager(
+        bucket_name=st.secrets["S3_BUCKET_NAME"],
+        region=region
+    )
+    
+    dynamo = DynamoDBChat(
+        table_name="ChatHistory",
+        region=region
+    )
+    
     return s3, dynamo
 
 s3_manager, chat_db = init_aws()
@@ -94,7 +105,7 @@ def get_qa_chain():
     """Create QA chain with GPT-4o-mini"""
     try:
         llm = ChatOpenAI(
-            model="gpt-4o-mini",  # ✅ Using GPT-4o-mini
+            model="gpt-4o-mini",
             temperature=0.3,
             max_tokens=500,
             api_key=st.secrets["OPENAI_API_KEY"]
@@ -113,14 +124,18 @@ Answer:"""
             input_variables=["context", "question"]
         )
         
-        return RetrievalQA.from_chain_type(
+        qa_chain = RetrievalQA.from_chain_type(
             llm=llm,
+            chain_type="stuff",
             retriever=st.session_state.vector_store.as_retriever(
                 search_kwargs={"k": 4}
             ),
             return_source_documents=True,
             chain_type_kwargs={"prompt": prompt}
         )
+        
+        return qa_chain
+        
     except Exception as e:
         st.error(f"Error creating QA chain: {e}")
         return None
@@ -197,17 +212,30 @@ if prompt := st.chat_input("Ask about your PDFs..."):
         # AI response
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
-                qa_chain = get_qa_chain()
-                result = qa_chain.invoke({"query": prompt})
-                answer = result['result']
-                
-                # Add sources
-                if 'source_documents' in result:
-                    sources = set([doc.metadata.get('source', 'Unknown') 
-                                 for doc in result['source_documents']])
-                    answer += f"\n\n📄 *Sources: {', '.join(sources)}*"
-                
-                st.write(answer)
-                
-                chat_db.save_message(st.session_state.session_id, "assistant", answer)
-                st.session_state.messages.append({"role": "assistant", "content": answer})
+                try:
+                    # Create QA chain
+                    qa_chain = get_qa_chain()
+                    
+                    # Check if chain was created successfully
+                    if qa_chain is None:
+                        st.error("❌ Failed to create QA chain. Check OpenAI API key and package versions.")
+                        st.stop()
+                    
+                    # Get response
+                    result = qa_chain.invoke({"query": prompt})
+                    answer = result['result']
+                    
+                    # Add sources
+                    if 'source_documents' in result and result['source_documents']:
+                        sources = set([doc.metadata.get('source', 'Unknown') 
+                                     for doc in result['source_documents']])
+                        answer += f"\n\n📄 *Sources: {', '.join(sources)}*"
+                    
+                    st.write(answer)
+                    
+                    chat_db.save_message(st.session_state.session_id, "assistant", answer)
+                    st.session_state.messages.append({"role": "assistant", "content": answer})
+                    
+                except Exception as e:
+                    st.error(f"❌ Error: {str(e)}")
+                    st.error("Please check your OpenAI API key and internet connection.")
