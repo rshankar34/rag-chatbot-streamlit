@@ -12,7 +12,7 @@
 # --- Streamlit ---
 streamlit==1.51.0
 
-# --- OpenAI & LangChain (STABLE V0.1.X FIX) ---
+# --- OpenAI & LangChain (STABLE V0.1.X STACK) ---
 openai==1.30.0
 langchain==0.1.17 
 langchain-core==0.1.48 
@@ -29,6 +29,6 @@ faiss-cpu==1.8.0
 # --- Embeddings ---
 sentence-transformers==2.5.1
 
-# --- Environment Stabilizers (Kept for safety) ---
+# --- Environment Stabilizers ---
 pydantic==2.8.3
 typing-extensions==4.12.4
