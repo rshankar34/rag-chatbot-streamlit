@@ -29,5 +29,8 @@ faiss-cpu==1.8.0
 # --- Embeddings ---
 sentence-transformers==2.5.1
 
-# --- ENVIRONMENT STABILIZATION FIX ---
+# --- CRITICAL ENVIRONMENT STABILIZATION FIXES ---
+# These pins resolve the 'AttributeError: module 'typing' has no attribute 'TypeAliasType''
 pyarrow==16.1.0
+pydantic==2.8.2
+typing-extensions==4.12.0
