@@ -12,18 +12,6 @@ from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 
 from aws_utils import S3Manager, DynamoDBChat
-import sys 
-#debugging info
-# DEBUG: Show package versions (remove after fixing)
-try:
-    import langchain_openai
-    import openai
-    st.sidebar.write(f"🔍 Python: {sys.version.split()[0]}")
-    st.sidebar.write(f"🔍 langchain-openai: {langchain_openai.__version__}")
-    st.sidebar.write(f"🔍 openai: {openai.__version__}")
-except Exception as e:
-    st.sidebar.write(f"⚠️ Debug error: {e}")
-
 
 # Page config
 st.set_page_config(page_title="RAG PDF Chatbot", page_icon="☁️", layout="wide")
