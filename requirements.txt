@@ -8,4 +8,3 @@ faiss-cpu==1.8.0
 pypdf==4.1.0
 boto3==1.34.69
 openai==1.25.0
-psutil==5.9.8
