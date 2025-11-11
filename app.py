@@ -6,11 +6,11 @@ import os
 import sys
 from pypdf import PdfReader
 
-# LangChain imports - using langchain_community
+# LangChain imports
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
-from langchain_community.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 
@@ -49,16 +49,64 @@ def init_embeddings():
 
 embeddings = init_embeddings()
 
+# Session state
+if 'session_id' not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
+if 'messages' not in st.session_state:
+    history = chat_db.get_history(st.session_state.session_id)
+    st.session_state.messages = [
+        {"role": msg['role'], "content": msg['content']} 
+        for msg in history
+    ]
+if 'vector_store' not in st.session_state:
+    st.session_state.vector_store = None
+
+# Helper functions
+def process_pdf(file_bytes, filename):
+    """Process PDF and add to vector store"""
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+        tmp.write(file_bytes)
+        tmp_path = tmp.name
+    
+    reader = PdfReader(tmp_path)
+    text = ""
+    for page in reader.pages:
+        text += page.extract_text()
+    
+    os.unlink(tmp_path)
+    
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=200
+    )
+    chunks = splitter.split_text(text)
+    
+    texts_with_meta = [(chunk, {"source": filename}) for chunk in chunks]
+    
+    if st.session_state.vector_store is None:
+        st.session_state.vector_store = FAISS.from_texts(
+            [t[0] for t in texts_with_meta],
+            embeddings,
+            metadatas=[t[1] for t in texts_with_meta]
+        )
+    else:
+        new_store = FAISS.from_texts(
+            [t[0] for t in texts_with_meta],
+            embeddings,
+            metadatas=[t[1] for t in texts_with_meta]
+        )
+        st.session_state.vector_store.merge_from(new_store)
+    
+    return True
+
 def get_qa_chain():
     """Create QA chain with GPT-4o-mini"""
     try:
-        from langchain_community.chat_models import ChatOpenAI
-        
         llm = ChatOpenAI(
-            model_name="gpt-4o-mini",
+            model="gpt-4o-mini",
             temperature=0.3,
             max_tokens=500,
-            openai_api_key=st.secrets["OPENAI_API_KEY"]
+            api_key=st.secrets["OPENAI_API_KEY"]
         )
         
         template = """Use the following context to answer the question. If you don't know the answer, say so clearly.
@@ -88,65 +136,7 @@ Answer:"""
         
     except Exception as e:
         st.error(f"Error creating QA chain: {e}")
-        import traceback
-        st.code(traceback.format_exc())
         return None
-
-
-# Session state
-if 'session_id' not in st.session_state:
-    st.session_state.session_id = str(uuid.uuid4())
-if 'messages' not in st.session_state:
-    history = chat_db.get_history(st.session_state.session_id)
-    st.session_state.messages = [
-        {"role": msg['role'], "content": msg['content']} 
-        for msg in history
-    ]
-if 'vector_store' not in st.session_state:
-    st.session_state.vector_store = None
-
-# Helper functions
-def process_pdf(file_bytes, filename):
-    """Process PDF and add to vector store"""
-    # Save temp file
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
-        tmp.write(file_bytes)
-        tmp_path = tmp.name
-    
-    # Extract text
-    reader = PdfReader(tmp_path)
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text()
-    
-    # Clean up
-    os.unlink(tmp_path)
-    
-    # Split into chunks
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200
-    )
-    chunks = splitter.split_text(text)
-    
-    # Create/update vector store
-    texts_with_meta = [(chunk, {"source": filename}) for chunk in chunks]
-    
-    if st.session_state.vector_store is None:
-        st.session_state.vector_store = FAISS.from_texts(
-            [t[0] for t in texts_with_meta],
-            embeddings,
-            metadatas=[t[1] for t in texts_with_meta]
-        )
-    else:
-        new_store = FAISS.from_texts(
-            [t[0] for t in texts_with_meta],
-            embeddings,
-            metadatas=[t[1] for t in texts_with_meta]
-        )
-        st.session_state.vector_store.merge_from(new_store)
-    
-    return True
 
 # UI
 st.title("☁️ RAG PDF Chatbot")
@@ -155,30 +145,6 @@ st.caption("Upload PDFs, ask questions powered by AI")
 # Sidebar
 with st.sidebar:
     st.header("📄 PDF Management")
-    
-    # DEBUG INFO
-    with st.expander("🔍 Debug Info", expanded=False):
-        try:
-            import importlib.metadata
-            python_ver = sys.version.split()[0]
-            st.write(f"**Python:** {python_ver}")
-            
-            try:
-                lc_ver = importlib.metadata.version('langchain')
-                st.write(f"**langchain:** {lc_ver}")
-            except:
-                st.write("**langchain:** unknown")
-            
-            try:
-                openai_ver = importlib.metadata.version('openai')
-                st.write(f"**openai:** {openai_ver}")
-            except:
-                st.write("**openai:** unknown")
-                
-        except Exception as e:
-            st.write(f"Error: {e}")
-    
-    st.divider()
     
     uploaded_files = st.file_uploader(
         "Upload PDFs",
@@ -190,15 +156,10 @@ with st.sidebar:
         if uploaded_files:
             progress = st.progress(0)
             for idx, file in enumerate(uploaded_files):
-                # Upload to S3
                 s3_key = s3_manager.upload_pdf(file.getvalue(), file.name)
-                
                 if s3_key:
-                    # Process PDF
                     process_pdf(file.getvalue(), file.name)
-                
                 progress.progress((idx + 1) / len(uploaded_files))
-            
             st.success(f"✅ Processed {len(uploaded_files)} PDF(s)!")
             progress.empty()
         else:
@@ -234,29 +195,24 @@ if prompt := st.chat_input("Ask about your PDFs..."):
     if not st.session_state.vector_store:
         st.error("⚠️ Upload PDFs first!")
     else:
-        # User message
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.write(prompt)
         
         chat_db.save_message(st.session_state.session_id, "user", prompt)
         
-        # AI response
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 try:
-                    # Create QA chain
                     qa_chain = get_qa_chain()
                     
                     if qa_chain is None:
-                        st.error("❌ Failed to create QA chain. Check OpenAI API key.")
+                        st.error("❌ Failed to create QA chain.")
                         st.stop()
                     
-                    # Get response
-                    result = qa_chain({"query": prompt})
+                    result = qa_chain.invoke({"query": prompt})
                     answer = result['result']
                     
-                    # Add sources
                     if 'source_documents' in result and result['source_documents']:
                         sources = set([doc.metadata.get('source', 'Unknown') 
                                      for doc in result['source_documents']])
