@@ -1,0 +1,9 @@
+streamlit==1.32.0
+langchain==0.1.10
+langchain-community==0.0.28
+langchain-openai==0.0.8
+sentence-transformers==2.5.1
+faiss-cpu==1.8.0
+pypdf==4.1.0
+boto3==1.34.69
+openai==1.14.0
