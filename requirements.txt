@@ -28,3 +28,6 @@ faiss-cpu==1.8.0
 
 # --- Embeddings ---
 sentence-transformers==2.5.1
+
+# --- ENVIRONMENT STABILIZATION FIX ---
+pyarrow==16.1.0
