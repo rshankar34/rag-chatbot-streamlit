@@ -12,12 +12,12 @@
 # --- Streamlit ---
 streamlit==1.51.0
 
-# --- OpenAI & LangChain (FIXED VERSIONS) ---
+# --- OpenAI & LangChain (STABLE V0.1.X FIX) ---
 openai==1.30.0
-langchain==0.2.10
-langchain-core==0.2.22
-langchain-community==0.2.7
-langchain-openai==0.1.17
+langchain==0.1.17 
+langchain-core==0.1.48 
+langchain-community==0.0.38
+langchain-openai==0.1.4 
 
 # --- AWS ---
 boto3==1.34.69
@@ -29,8 +29,6 @@ faiss-cpu==1.8.0
 # --- Embeddings ---
 sentence-transformers==2.5.1
 
-# --- CRITICAL ENVIRONMENT STABILIZATION FIXES ---
-# These pins resolve the 'AttributeError: module 'typing' has no attribute 'TypeAliasType''
-pyarrow==16.1.0
-pydantic==2.8.2
-typing-extensions==4.12.0
+# --- Environment Stabilizers (Kept for safety) ---
+pydantic==2.8.3
+typing-extensions==4.12.4
