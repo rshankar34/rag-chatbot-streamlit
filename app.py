@@ -3,11 +3,14 @@ import streamlit as st
 import uuid
 import tempfile
 import os
+import sys
 from pypdf import PdfReader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+# LangChain imports - using stable versions
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
-from langchain_openai import ChatOpenAI
+from langchain.chat_models import ChatOpenAI
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 
@@ -105,13 +108,13 @@ def get_qa_chain():
     """Create QA chain with GPT-4o-mini"""
     try:
         llm = ChatOpenAI(
-            model="gpt-4o-mini",
+            model_name="gpt-4o-mini",
             temperature=0.3,
             max_tokens=500,
-            api_key=st.secrets["OPENAI_API_KEY"]
+            openai_api_key=st.secrets["OPENAI_API_KEY"]
         )
         
-        template = """Use the context to answer the question. If you don't know the answer, say so clearly.
+        template = """Use the following context to answer the question. If you don't know the answer, say so clearly.
 
 Context: {context}
 
@@ -147,6 +150,30 @@ st.caption("Upload PDFs, ask questions powered by AI")
 # Sidebar
 with st.sidebar:
     st.header("📄 PDF Management")
+    
+    # DEBUG INFO
+    with st.expander("🔍 Debug Info", expanded=False):
+        try:
+            import importlib.metadata
+            python_ver = sys.version.split()[0]
+            st.write(f"**Python:** {python_ver}")
+            
+            try:
+                lc_ver = importlib.metadata.version('langchain')
+                st.write(f"**langchain:** {lc_ver}")
+            except:
+                st.write("**langchain:** unknown")
+            
+            try:
+                openai_ver = importlib.metadata.version('openai')
+                st.write(f"**openai:** {openai_ver}")
+            except:
+                st.write("**openai:** unknown")
+                
+        except Exception as e:
+            st.write(f"Error: {e}")
+    
+    st.divider()
     
     uploaded_files = st.file_uploader(
         "Upload PDFs",
@@ -216,13 +243,12 @@ if prompt := st.chat_input("Ask about your PDFs..."):
                     # Create QA chain
                     qa_chain = get_qa_chain()
                     
-                    # Check if chain was created successfully
                     if qa_chain is None:
-                        st.error("❌ Failed to create QA chain. Check OpenAI API key and package versions.")
+                        st.error("❌ Failed to create QA chain. Check OpenAI API key.")
                         st.stop()
                     
                     # Get response
-                    result = qa_chain.invoke({"query": prompt})
+                    result = qa_chain({"query": prompt})
                     answer = result['result']
                     
                     # Add sources
@@ -238,4 +264,3 @@ if prompt := st.chat_input("Ask about your PDFs..."):
                     
                 except Exception as e:
                     st.error(f"❌ Error: {str(e)}")
-                    st.error("Please check your OpenAI API key and internet connection.")
