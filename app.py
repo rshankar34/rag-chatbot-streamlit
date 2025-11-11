@@ -13,6 +13,10 @@ from langchain.prompts import PromptTemplate
 
 from aws_utils import S3Manager, DynamoDBChat
 
+#debugging info
+st.sidebar.write(f"🔍 langchain-openai: {langchain_openai.__version__}")
+st.sidebar.write(f"🔍 openai: {openai.__version__}")
+
 # Page config
 st.set_page_config(page_title="RAG PDF Chatbot", page_icon="☁️", layout="wide")
 
